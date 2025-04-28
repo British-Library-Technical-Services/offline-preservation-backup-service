@@ -2,14 +2,14 @@ import os
 from datetime import datetime
 import logging
 
-LOG_WRITE_LOCATION = os.getenv("BACKUP_LOCATION")
+def setup_logger(write_location):
+    logging.basicConfig(
+        level = logging.INFO,
+        format = "%(asctime)s:%(module)s:%(levelname)s:%(message)s",
+        handlers = [
+            logging.FileHandler(os.path.join(write_location, "backup.log")),
+        ]
+    )
 
-logging.basicConfig(
-    level = logging.INFO,
-    format = "%(asctime)s:%(module)s:%(levelname)s:%(message)s",
-    handlers = [
-        logging.FileHandler(os.path.join(LOG_WRITE_LOCATION, "backup.log")),
-    ]
-)
-
-logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
+    return logger

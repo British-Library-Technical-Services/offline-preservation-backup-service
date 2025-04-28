@@ -1,156 +1,132 @@
+import sys
 import os
 import shutil
-import hashlib
+import hashlib 
+import tkinter as tk
+from tkinter import filedialog
 from pathlib import Path
 from datetime import datetime
+
 from tqdm import tqdm
 
-from logger import logger
+from logger import setup_logger
 from report import write_report
 
-SOURCE_LOCATION = os.getenv("SOURCE_LOCATION")
-BACKUP_LOCATION = os.getenv("BACKUP_LOCATION")
+class PreservationBackupService:
+    def __init__(self, file: str, source_path: str, backup_path: str) -> None:
+        print(source_path, backup_path)
+        self.file: str = file
+        self.md5_file: str = f"{file}.md5"
+        self.md5_string: str = ""
+        self.source_path: str = source_path
+        self.backup_path: str = backup_path
+        self.backup_file: str = file.replace(source_path, backup_path)
+        self.backup_md5_file: str = self.md5_file.replace(source_path, backup_path) # BUG: need to correctly resolve path object
+    
+    def parse_file_type(self) -> None:
+        if self.file.endswith(".md5"):
+            pass
 
-source_files = []
-checksums_generated = []
-skipped_files = []
-invalid_files = []
+        elif os.path.isfile(self.file) and self.file.startswith("."):
+            pass
 
-def checksum_validate(file_checksum, md5_hash):
-    if file_checksum == md5_hash:
-        return True
-    else:
-        return False
+        elif os.path.isdir(self.file) and not os.path.exists(self.backup_file):
+            self.write_directory_in_backup()
 
+        elif os.path.isfile(self.file) and not os.path.exists(self.md5_file):
+            self.generate_file_checksum(file=self.file)
+            self.write_checksum_file()
 
-def md5_write(file, file_checksum):
-    filename = os.path.basename(file).replace(".md5", "")
+    def write_directory_in_backup(self):
+        try:
+            os.mkdir(self.backup_file)
+        except OSError as ose:
+            return ose
 
-    try:
-        with open(file, "w") as f:
-            f.write(f"{file_checksum} *{filename}")
-    except OSError as e:
-        logger.error(e)
+    def generate_file_checksum(self, file):
+        file_hash: hash = hashlib.md5()
 
+        try:
+            with open(file, "rb") as f:
+                while buffer := f.read(8128):
+                    file_hash.update(buffer)
+            
+            self.md5_string = file_hash.hexdigest()
+        except FileNotFoundError as fnfe:
+            return fnfe
+        except IOError as ioe:
+            return ioe
+    
+    def write_checksum_file(self):
+        try:
+            with open(self.md5_file, "w", encoding="utf-8") as f: # f: TextIO
+                f.write(f"{self.md5_string} *{os.path.basename(self.file)}")
+        
+        except FileNotFoundError as fnfe:
+            return fnfe
+        except IOError as ioe:
+            return ioe
+        
+    def copy_file_to_back(self) -> None:
 
-def md5_generate(file):
-    try:
-        with open(file, "rb") as f:
-            file_hash = hashlib.md5()
-            while chunk := f.read(8192):
-                file_hash.update(chunk)
-
-            return file_hash.hexdigest()
-
-    except OSError as e:
-        logger.error(e)
-
-
-def md5_read(file):
-    try:
-        with open(file, "r") as f:
-            return f.read(32)
-    except OSError as e:
-        logger.error(e)
-
-
-def file_copy(src, dst):
-    try:
-        shutil.copy2(src, dst)
-        logger.info(f"copied file,{src},{dst}")
-    except OSError as e:
-        logger.error(e)
-
-
-def directory_write(directory):
-    try:
-        os.mkdir(os.path.join(directory))
-    except OSError as e:
-        logger.error(e)
-
-
-start_time = datetime.now()
-logger.info(f"backup started,{start_time}")
-
-print("---| Full Backup in Progress. Please wait... |---")
-
-size_stat = 0
-
-for root in tqdm(sorted(Path(SOURCE_LOCATION).rglob("*")), desc="IN PROGRESS"):
-
-
-    source = str(SOURCE_LOCATION)
-    source_path = str(root)
-    backup = str(root).replace(SOURCE_LOCATION, BACKUP_LOCATION)
-
-    if str(root).endswith(".md5"):
-        pass
-
-    elif os.path.isdir(root) and not os.path.exists(backup):
-        logger.info(f"writing directory,{backup}")
-        directory_write(backup)
-        pass
-
-    elif os.path.isfile(root) and os.path.basename(root).startswith("."):
-        pass
-
-    elif (
-        os.path.isfile(root)
-        and not str(root).endswith(".md5")
-        and not os.path.exists(backup)
-    ):
-        source_files.append(root)
-
-        md5_file = f"{root}.md5"
-
-        if not os.path.exists(md5_file):
-            file_checksum = md5_generate(root)
-            md5_write(md5_file, file_checksum)
-            logger.info(f"generated checksum,{root},{file_checksum}")
-
-            checksums_generated.append(md5_file)
-
-
-        file_copy(md5_file, f"{backup}.md5")
-        file_copy(root, backup)
-        size_stat += root.stat().st_size
-
-        file_checksum = md5_generate(backup)
-        md5_file = f"{backup}.md5"
-
-        if not checksum_validate(file_checksum, md5_read(md5_file)):
-            logger.critical(f"checksum INVALID,{root},{file_checksum}")
-            invalid_files.append(root)
-            os.remove(backup)
-            os.remove(md5_file)
-            logger.warning(f"removed invalid file from backup,{backup}")
+        if not os.path.exists(self.backup_file) and not os.path.exists(self.backup_md5_file):
+            shutil.copy2(self.file, self.backup_file)
+            shutil.copy2(self.md5_file, self.backup_md5_file)
         else:
-            logger.info(f"checksum VALID,{root},{file_checksum}")
+            # log file exists in backup
+            pass
 
-    elif os.path.isfile(root) and os.path.exists(backup):
-        logger.info(f"{root} exists in {backup}. SKIPPING file")
-        skipped_files.append(root)
+    
+    def read_file_checksum(self, file_checksum_string: str) -> bool:
+        try:
+            with open(self.backup_md5_file, "r", encoding="utf-8") as f:
+                checksum_file_string: str = f.read(32)
+        except FileNotFoundError as fnfe:
+            return fnfe
+        except IOError as ioe:
+            return ioe
+            
+        if not file_checksum_string == checksum_file_string:
+            return False
+        else:
+            return True 
+    
 
+    def validate_file_checksum(self):
+        source_file_checksum: str = self.md5_string
+
+        if os.path.exists(self.backup_file):
+            self.generate_file_checksum(file=self.backup_file)
+            self.read_file_checksum(file_checksum_string=source_file_checksum)
+            
+
+def set_location() -> str:
+    window = tk.Tk()
+    window.attributes("-topmost", True)
+
+    try:        
+        location: str = filedialog.askdirectory(initialdir="~/media/")
+    except FileNotFoundError as fnfe:
+        print("Error opening directory selection dialog %s. Exiting", fnfe)
+        sys.exit(1)
+
+    if not os.path.exists(location) or location == "":
+        print("Path location does not exist. Exiting")
+        sys.exit(1)
     else:
-        pass
+        return location
 
-end_time = datetime.now()
-duration = end_time - start_time
-total_files = len(source_files) + len(skipped_files)
-copied_files = total_files - len(skipped_files) - len(invalid_files)
-total_size = size_stat / (1024 ** 2)
 
-write_report(
-    start_time,
-    end_time,
-    duration,
-    total_files,
-    copied_files,
-    checksums_generated,
-    skipped_files,
-    total_size,
-    invalid_files,
-)
+def main():
+    source_location: str = set_location()
+    backup_location: str = set_location()
 
-logger.info(f"backup completed,{end_time}")
-logger.info(f"backup duration,{duration}")
+    for item in tqdm(sorted(Path(source_location).rglob("*")), desc="FUll Backup in Progress"):
+        pbs = PreservationBackupService(file=item, source_path=source_location, backup_path=backup_location)
+        pbs.parse_file_type()
+        pbs.copy_file_to_back()
+        pbs.validate_file_checksum()
+
+
+if __name__ == "__main__":
+    main()
