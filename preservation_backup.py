@@ -147,7 +147,7 @@ def main():
                 pbs.generate_file_checksum(file=item)
                 pbs.write_checksum_file()
             
-                copy_status = pbs.copy_file_to_backup()
+            copy_status = pbs.copy_file_to_backup()
                     
                 # if isinstance(copy_status, str) and "exists" in copy_status:
                 if not copy_status:
