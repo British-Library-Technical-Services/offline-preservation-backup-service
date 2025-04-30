@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 import logging
 
-def setup_logger(write_location):
+def setup_logger(write_location: str):
     logging.basicConfig(
         level = logging.INFO,
         format = "%(asctime)s:%(module)s:%(levelname)s:%(message)s",
