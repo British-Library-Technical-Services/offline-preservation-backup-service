@@ -1,3 +1,17 @@
+"""Backup reporting utilities.
+
+This module is responsible for producing a human‑readable Markdown summary of a
+backup run executed by the preservation backup service. The generated report
+captures timing, file counts, checksum activity, skipped and invalid files,
+and aggregate data size. Reports are written to the backup destination.
+
+Environment variables:
+    BACKUP_LOCATION: Directory where the Markdown report will be created.
+
+Exports:
+    write_report(...): Persist a formatted backup report to BACKUP_LOCATION.
+"""
+
 import os
 
 write_location = os.getenv("BACKUP_LOCATION")
@@ -14,6 +28,25 @@ def write_report(
     total_size,
     invalid_files,
 ):
+    """Write a Markdown report summarising a completed backup run.
+
+    Args:
+        start_time (datetime): When the backup process began.
+        end_time (datetime): When the backup process ended.
+        duration (timedelta): Elapsed wall-clock time (end - start).
+        total_files (int): Count of source files encountered (incl. skipped).
+        copied_files (int): Number of files successfully copied.
+        checksums_generated (list[Path | str]): Newly created checksum files.
+        skipped_files (list[Path | str]): Files found already present in backup.
+        total_size (float): Aggregate size in MB of copied data.
+        invalid_files (list[Path | str]): Files whose checksum validation failed.
+
+    Side Effects:
+        Writes a file named backup_report_<timestamp>.md into BACKUP_LOCATION.
+
+    Notes:
+        The timestamp in the filename is derived from end_time.
+    """
 
     report = f"""
 # BACKUP REPORT
