@@ -20,6 +20,10 @@ import os
 from datetime import datetime
 import logging
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 LOG_WRITE_LOCATION = os.getenv("BACKUP_LOCATION")
 
 logging.basicConfig(
