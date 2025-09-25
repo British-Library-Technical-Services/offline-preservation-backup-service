@@ -29,10 +29,14 @@ import shutil
 import hashlib
 from pathlib import Path
 from datetime import datetime
+
+from dotenv import load_dotenv
 from tqdm import tqdm
 
 from logger import logger
 from report import write_report
+
+load_dotenv()
 
 SOURCE_LOCATION = os.getenv("SOURCE_LOCATION")
 BACKUP_LOCATION = os.getenv("BACKUP_LOCATION")
@@ -70,7 +74,7 @@ def md5_write(file, file_checksum):
     """
     filename = os.path.basename(file).replace(".md5", "")
     try:
-        with open(file, "w") as f:
+        with open(file, "w", encoding="utf-8") as f:
             f.write(f"{file_checksum} *{filename}")
     except OSError as e:
         logger.error(e)
