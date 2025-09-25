@@ -68,5 +68,5 @@ def write_report(
             report += f"    * {f}\n"
 
     end_time = end_time.strftime("%Y-%m-%d_%H-%M-%S")
-    with open(os.path.join(write_location, f"backup_report_{end_time}.md"), "w") as f:
+    with open(os.path.join(write_location, f"backup_report_{end_time}.md"), "w", encoding="utf-8") as f:
         f.write(os.path.join(report))
